@@ -7,5 +7,5 @@ dependencies:
   - drupal:chosen
   - drupal:workbench_reviewer
 config_devel:
-  install:
+  optional:
     - views.view.tide_workflow_reviewer_view

@@ -24,7 +24,7 @@ Feature: view fields, extra fields, views and access
       | test.admin    |      1 | 999998 | site.admin@example.com    | L9dx9IJz3'M* | Test Section 11 | Site Admin |
       | test.approver |      1 | 999997 | test.approver@example.com | L9dx9IJz3'M* | Test Section 11 | Approver   |
 
-    And landing_page content:
+    And test content:
       | title       | path       | moderation_state | uuid                                | field_node_site                                             | field_node_primary_site | nid     | field_topic  | workbench_reviewer |
       | [TEST] LP 1 | /test-lp-1 | needs_review     | 99999999-aaaa-bbbb-ccc-000000000001 | Test Site 1, Test Section 11                                | Test Site 1             | 999999  | Test topic 1 | 999999             |
       | [TEST] LP 2 | /test-lp-2 | needs_review     | 99999999-aaaa-bbbb-ccc-000000000002 | Test Site 1, Test Section 11, Test Section 12               | Test Site 1             | 999998  | Test topic 2 | 999999             |
