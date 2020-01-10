@@ -79,10 +79,3 @@ function tide_workflow_reviewer_mail($key, &$message, $params) {
       break;
   }
 }
-
-/**
- * Implements hook_form_BASE_FORM_ID_alter().
- */
-function tide_workflow_reviewer_form_node_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
-  dsm($form);
-}
