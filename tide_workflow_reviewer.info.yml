@@ -1,0 +1,11 @@
+name: 'Tide Workbench Reviewer'
+type: module
+description: 'Site administrators can assign contents to other users for review'
+core: 8.x
+package: Tide
+dependencies:
+  - drupal:chosen
+  - drupal:workbench_reviewer
+config_devel:
+  install:
+    - views.view.tide_workflow_reviewer_view

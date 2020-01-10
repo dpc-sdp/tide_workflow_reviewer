@@ -1,0 +1,6 @@
+tide_workflow_reviewer.content_list:
+  title: Assigning Content
+  description: 'site administrators can assign contents to other users for review'
+  route_name: view.tide_workflow_reviewer_view.page_1
+  parent: system.admin
+  weight: 100

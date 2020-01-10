@@ -1,0 +1,88 @@
+<?php
+
+/**
+ * @file
+ * Contains tide_workflow_reviewer.module.
+ */
+
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+use Drupal\node\Entity\NodeType;
+
+/**
+ * Implements hook_help().
+ */
+function tide_workflow_reviewer_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    // Main module help for the tide_workflow_reviewer module.
+    case 'help.page.tide_workflow_reviewer':
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('Site administrators can assign pages to content authors') . '</p>';
+      return $output;
+
+    default:
+  }
+}
+
+/**
+ * Implements hook_entity_extra_field_info().
+ */
+function tide_workflow_reviewer_entity_extra_field_info() {
+  $extra = [];
+
+  foreach (NodeType::loadMultiple() as $bundle) {
+    $extra['node'][$bundle->id()]['display']['tide_workflow_reviewer_extra'] = [
+      'label' => t('Assign to user'),
+      'description' => t('Site administrators can assign contents to other users for review'),
+      'weight' => 100,
+      'visible' => TRUE,
+    ];
+  }
+
+  return $extra;
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_view().
+ */
+function tide_workflow_reviewer_node_view(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display, $view_mode) {
+  if ($entity->moderation_state->value == 'needs_review' && count(array_intersect(\Drupal::currentUser()->getRoles(), ['site_admin', 'administrator'])) > 0 && $display->getComponent('tide_workflow_reviewer_extra')) {
+    $build['tide_workflow_reviewer_extra'] = \Drupal::formBuilder()
+      ->getForm('Drupal\tide_workflow_reviewer\Form\TideWorkflowReviewerForm');
+  }
+}
+
+/**
+ * Implements hook_mail().
+ */
+function tide_workflow_reviewer_mail($key, &$message, $params) {
+  $options = [
+    'langcode' => $message['langcode'],
+  ];
+  /** @var \Drupal\user\Entity\User $user */
+  $user = \Drupal::currentUser();
+  switch ($key) {
+    case 'tide_workflow_reviewer_email':
+      $message['from'] = $user->getEmail();
+      $message['subject'] = t('A content item is pending for reviewing', $options);
+      $message['body'][] = t('The following content item is awaiting review.');
+      $message['body'][] = t('Title: @title', [
+        '@title' => $params['title_of_content'],
+      ], $options);
+      $message['body'][] = t('Link: @link', [
+        '@link' => $params['node_link'],
+      ], $options);
+      $message['body'][] = $params['message'];
+      $message['body'][] = $user->getDisplayName();
+      break;
+  }
+}
+
+/**
+ * Implements hook_form_BASE_FORM_ID_alter().
+ */
+function tide_workflow_reviewer_form_node_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
+  dsm($form);
+}

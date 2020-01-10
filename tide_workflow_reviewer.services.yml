@@ -1,0 +1,4 @@
+services:
+  tide_workflow_reviewer.helper:
+    class: Drupal\tide_workflow_reviewer\TideWorkflowReviewerHelper
+    arguments: []

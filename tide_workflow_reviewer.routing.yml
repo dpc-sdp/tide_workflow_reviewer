@@ -1,0 +1,12 @@
+tide_workflow_reviewer.reviewer_form:
+  path: '/workflow_reviewer/{node}'
+  defaults:
+    _form: '\Drupal\tide_workflow_reviewer\Form\TideWorkflowReviewerForm'
+    _title: 'Reviewer Form'
+  requirements:
+    _custom_access: '\Drupal\tide_workflow_reviewer\Controller\TideWorkflowReviewerController::access'
+  options:
+    parameters:
+      node:
+        type: 'entity:node'
+        converter: 'paramconverter.entity'
