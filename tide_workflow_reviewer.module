@@ -52,6 +52,14 @@ function tide_workflow_reviewer_entity_extra_field_info() {
  * Implements hook_ENTITY_TYPE_view().
  */
 function tide_workflow_reviewer_node_view(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display, $view_mode) {
+  $valid_routes = [
+    'entity.node.latest_version',
+    'entity.node.canonical',
+  ];
+  $route_name = \Drupal::routeMatch()->getRouteName();
+  if (!in_array($route_name, $valid_routes)) {
+    return;
+  }
   if ($entity->moderation_state->value == 'needs_review' && count(array_intersect(\Drupal::currentUser()->getRoles(), ['site_admin', 'administrator'])) > 0 && $display->getComponent('tide_workflow_reviewer_extra')) {
     $build['tide_workflow_reviewer_extra'] = \Drupal::formBuilder()
       ->getForm('Drupal\tide_workflow_reviewer\Form\TideWorkflowReviewerForm');
