@@ -70,7 +70,7 @@ class TideWorkflowReviewerForm extends FormBase {
     $this->routeMatch->getParameter('node');
     $form['tide_workflow_reviewer']['options'] = [
       '#type' => 'select',
-      '#title' => $node->label() . ' Assigning to',
+      '#title' => '<p>Assign</p>' . '<em>' . $node->label() . '</em>' . '<p>to</p>',
       '#chosen' => TRUE,
       '#options' => $options,
       '#multiple' => FALSE,
@@ -89,6 +89,7 @@ class TideWorkflowReviewerForm extends FormBase {
         [$this, 'apply'],
       ],
     ];
+    $form['#attached']['library'][] = 'tide_workflow_reviewer/tide-workflow-reviewer-form';
     return $form;
   }
 

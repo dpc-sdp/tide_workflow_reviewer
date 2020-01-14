@@ -1,0 +1,4 @@
+tide-workflow-reviewer-form:
+  css:
+    theme:
+      css/tide_workflow_reviewer.css: {}
