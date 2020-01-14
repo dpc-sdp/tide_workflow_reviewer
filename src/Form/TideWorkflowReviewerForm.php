@@ -6,6 +6,7 @@ use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\node\NodeInterface;
+use Drupal\node\Entity\Node;
 use Drupal\tide_workflow_reviewer\TideWorkflowReviewerHelper;
 use Drupal\user\Entity\User;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -61,6 +62,9 @@ class TideWorkflowReviewerForm extends FormBase {
   public function buildForm(array $form, FormStateInterface $form_state, NodeInterface $node = NULL) {
     if (!$node) {
       $node = $this->routeMatch->getParameter('node');
+    }
+    if (!$node instanceof NodeInterface && $this->routeMatch->getRouteName() == 'entity.node.revision') {
+      $node = Node::load($node);
     }
     $options = $this->helper->getAssociatedUsers($node);
     $this->routeMatch->getParameter('node');
