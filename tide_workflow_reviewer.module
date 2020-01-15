@@ -52,15 +52,7 @@ function tide_workflow_reviewer_entity_extra_field_info() {
  * Implements hook_ENTITY_TYPE_view().
  */
 function tide_workflow_reviewer_node_view(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display, $view_mode) {
-  $valid_routes = [
-    'entity.node.latest_version',
-    'entity.node.canonical',
-  ];
-  $route_name = \Drupal::routeMatch()->getRouteName();
-  if (!in_array($route_name, $valid_routes)) {
-    return;
-  }
-  if ($entity->moderation_state->value == 'needs_review' && count(array_intersect(\Drupal::currentUser()->getRoles(), ['site_admin', 'administrator'])) > 0 && $display->getComponent('tide_workflow_reviewer_extra')) {
+  if ($entity->moderation_state->value == 'needs_review' && is_user_on_node_routes(\Drupal::currentUser()) && $display->getComponent('tide_workflow_reviewer_extra')) {
     $build['tide_workflow_reviewer_extra'] = \Drupal::formBuilder()
       ->getForm('Drupal\tide_workflow_reviewer\Form\TideWorkflowReviewerForm');
   }
@@ -97,16 +89,24 @@ function tide_workflow_reviewer_mail($key, &$message, $params) {
  */
 function tide_workflow_reviewer_node_access(NodeInterface $node, $op, AccountInterface $account) {
   if (\Drupal::moduleHandler()->moduleExists('workbench_reviewer')) {
+    // If moderation_state not equal to needs_review,
+    // don't interfere core permission check.
     if ($node->moderation_state->value != 'needs_review') {
       return AccessResult::neutral();
     }
     if ($op == 'update' || $op == 'delete') {
+      // If workbench_reviewer not set, don't interfere core permission check.
       if ($node->workbench_reviewer->isEmpty()) {
         return AccessResult::neutral();
       }
+      // If workbench_reviewer is current user,
+      // don't interfere core permission check.
       if ($node->workbench_reviewer->entity->id() == $account->id()) {
         return AccessResult::neutral();
       }
+      // Access denied against editors only happens when
+      // the assigned reviewer is reviewing the node.
+      // The users with site_admin role have permission to edit the node.
       return AccessResult::forbiddenIf(!in_array('site_admin', $account->getRoles()));
     }
   }
@@ -117,6 +117,75 @@ function tide_workflow_reviewer_node_access(NodeInterface $node, $op, AccountInt
  */
 function vicgovau_core_form_node_form_alter(&$form, FormStateInterface $form_state, $form_id) {
   if (isset($form['workbench_reviewer'])) {
+    $form['revision_log']['#group'] = 'revision_information';
     unset($form['workbench_reviewer']);
+    unset($form['workflow']);
   }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function tide_workflow_reviewer_form_content_moderation_entity_moderation_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  // Disable the moderation form if it is necessary.
+  // If the user with site_admin role, moderation form will be always opened.
+  // If the user is workbench_reviewer user, moderation form will be opened.
+  // For the user who is not reviewer will not allow to change moderation stats.
+  if (!is_user_on_node_routes(\Drupal::currentUser())) {
+    $form['new_state']['#disabled'] = TRUE;
+    $form['revision_log']['#disabled'] = TRUE;
+    $form['submit']['#disabled'] = TRUE;
+  }
+}
+
+/**
+ * Helper function.
+ *
+ * This is for checking if the user who has ['site_admin', 'administrator']
+ * roles and checking if the user is viewing the node view.
+ *
+ * @param \Drupal\Core\Session\AccountInterface $user
+ *   Current User.
+ *
+ * @return bool
+ *   Returns True or False.
+ */
+function is_user_on_node_routes(AccountInterface $user) {
+  $result = FALSE;
+  // Only checking two routes.
+  $valid_routes = [
+    'entity.node.latest_version',
+    'entity.node.canonical',
+  ];
+
+  $route_name = \Drupal::routeMatch()->getRouteName();
+  $node = \Drupal::routeMatch()->getParameter('node');
+
+  if (in_array($route_name, $valid_routes) && user_has_roles(['site_admin', 'administrator'], $user)) {
+    $result = TRUE;
+  }
+  // Returns true if workbench reviewer is the user who was passed in.
+  if (!$node->workbench_reviewer->isEmpty() && $node->workbench_reviewer->entity->id() == $user->id()) {
+    $result = TRUE;
+  }
+  return $result;
+}
+
+/**
+ * Helper function for checking if the user has roles.
+ *
+ * @param array $roles
+ *   Eg. ['site_admin', 'administrator'].
+ * @param \Drupal\Core\Session\AccountInterface $user
+ *   The user entity.
+ *
+ * @return bool
+ *   returns TRUE means that at lease 1 role matches the role that the user has.
+ */
+function user_has_roles(array $roles, AccountInterface $user) {
+  $result = FALSE;
+  if (count(array_intersect($user->getRoles(), $roles)) > 0) {
+    $result = TRUE;
+  }
+  return $result;
 }

@@ -22,13 +22,18 @@ class TideWorkflowReviewerHelper {
    *   A list of users keyed by node id.
    */
   public function getAssociatedUsers(NodeInterface $node): array {
-    $users = User::loadMultiple();
+    $user_storage = \Drupal::service('entity_type.manager')->getStorage('user');
+    $query = $user_storage->getQuery();
+    $condition = $query->orConditionGroup()
+      ->condition('roles', 'approver', 'CONTAINS')
+      ->condition('roles', 'editor', 'CONTAINS');
+    $query->condition($condition);
+    $result = $query->execute();
+    $users = User::loadMultiple($result);
     $options = [];
     $options['empty'] = '';
     foreach ($users as $user) {
-      if ($node->access('update', $user)) {
-        $options[$user->id()] = $user->label();
-      }
+      $options[$user->id()] = $user->label();
     }
     return $options;
   }
