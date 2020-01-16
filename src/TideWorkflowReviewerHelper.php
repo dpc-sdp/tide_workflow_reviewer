@@ -6,6 +6,7 @@ use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\node\NodeInterface;
 use Drupal\user\Entity\User;
 use Drupal\user\UserInterface;
+use Drupal\Core\Session\AccountInterface;
 
 /**
  * Helper class.
@@ -21,7 +22,7 @@ class TideWorkflowReviewerHelper {
    * @return array
    *   A list of users keyed by node id.
    */
-  public function getAssociatedUsers(NodeInterface $node): array {
+  public static function getAssociatedUsers(NodeInterface $node): array {
     $user_storage = \Drupal::service('entity_type.manager')->getStorage('user');
     $query = $user_storage->getQuery();
     $condition = $query->orConditionGroup()
@@ -41,15 +42,16 @@ class TideWorkflowReviewerHelper {
   /**
    * Update the node with the workbench_reviewer field.
    */
-  public function updatesAssignedUserWithNode(NodeInterface $node, UserInterface $user) {
+  public static function updatesAssignedUserWithNode(NodeInterface $node, UserInterface $user, string $message): void {
     $node->workbench_reviewer->entity = $user;
+    $node->revision_log = $message;
     $node->save();
   }
 
   /**
    * Sending email.
    */
-  public function mail(NodeInterface $node, User $user, array $extras) {
+  public static function mail(NodeInterface $node, User $user, array $extras):void {
     global $base_url;
     $mail_manager = \Drupal::service('plugin.manager.mail');
     /** @var Drupal\Core\Messenger\MessengerInterface $messenger */
@@ -69,6 +71,84 @@ class TideWorkflowReviewerHelper {
     else {
       $messenger->addMessage(t('Your email notifications has been sent.'), MessengerInterface::TYPE_STATUS);
     }
+  }
+
+  /**
+   * Helper function for checking if the user has roles.
+   *
+   * @param array $roles
+   *   Eg. ['site_admin', 'administrator'].
+   * @param \Drupal\Core\Session\AccountInterface $user
+   *   The user entity.
+   *
+   * @return bool
+   *   returns TRUE means
+   *   that at lease 1 role matches the role that the user has.
+   */
+  public static function userHasRoles(array $roles, AccountInterface $user): bool {
+    $result = FALSE;
+    if (count(array_intersect($user->getRoles(), $roles)) > 0) {
+      $result = TRUE;
+    }
+    return $result;
+  }
+
+  /**
+   * Helper function.
+   *
+   * This is for checking if the user who has ['site_admin', 'administrator']
+   * roles and checking if the user is viewing the node view.
+   *
+   * @param \Drupal\Core\Session\AccountInterface $user
+   *   Current User.
+   * @param array $roles
+   *   User roles.
+   * @param array $routes
+   *   Routes.
+   *
+   * @return bool
+   *   Returns True or False.
+   */
+  public static function areRolesOnRoutes(AccountInterface $user, array $roles, array $routes): bool {
+    $result = FALSE;
+    $route_name = \Drupal::routeMatch()->getRouteName();
+    if (in_array($route_name, $routes) && static::userHasRoles($roles, $user)) {
+      $result = TRUE;
+    }
+    return $result;
+  }
+
+  /**
+   * Helper function.
+   *
+   * A helper function for checking whether the current user has right
+   * permission in right router.This function is only for this module.
+   *
+   * @param \Drupal\Core\Session\AccountInterface $user
+   *   The current user.
+   *
+   * @return bool
+   *   Returns
+   */
+  public static function hasPermissionToReviewerWidget(AccountInterface $user): bool {
+    // Only checking two routes.
+    $valid_routes = [
+      'entity.node.latest_version',
+      'entity.node.canonical',
+    ];
+    $roles = ['site_admin', 'administrator'];
+
+    // Returns true if the current user with the roles listed above.
+    if (static::areRolesOnRoutes($user, $roles, $valid_routes)) {
+      return TRUE;
+    }
+
+    $node = \Drupal::routeMatch()->getParameter('node');
+    // Returns true if workbench reviewer is the current user.
+    if ($node instanceof NodeInterface && !$node->workbench_reviewer->isEmpty() && $node->workbench_reviewer->entity->id() == $user->id()) {
+      return TRUE;
+    }
+    return FALSE;
   }
 
 }
