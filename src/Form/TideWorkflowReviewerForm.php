@@ -15,14 +15,6 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  */
 class TideWorkflowReviewerForm extends FormBase {
 
-
-  /**
-   * Helper.
-   *
-   * @var \Drupal\tide_workflow_reviewer\TideWorkflowReviewerHelper
-   */
-  protected $helper;
-
   /**
    * Router match.
    *
@@ -33,8 +25,7 @@ class TideWorkflowReviewerForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function __construct(TideWorkflowReviewerHelper $helper, RouteMatchInterface $route_match) {
-    $this->helper = $helper;
+  public function __construct(RouteMatchInterface $route_match) {
     $this->routeMatch = $route_match;
   }
 
@@ -43,7 +34,6 @@ class TideWorkflowReviewerForm extends FormBase {
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('tide_workflow_reviewer.helper'),
       $container->get('current_route_match')
     );
   }
@@ -62,11 +52,12 @@ class TideWorkflowReviewerForm extends FormBase {
     if (!$node) {
       $node = $this->routeMatch->getParameter('node');
     }
-    $options = $this->helper->getAssociatedUsers($node);
+
+    $options = TideWorkflowReviewerHelper::getAssociatedUsers($node);
     $this->routeMatch->getParameter('node');
     $form['tide_workflow_reviewer']['options'] = [
       '#type' => 'select',
-      '#title' => $node->label() . ' Assigning to',
+      '#title' => '<p>Assign</p>' . '<em>' . $node->label() . '</em>' . '<p>to</p>',
       '#chosen' => TRUE,
       '#options' => $options,
       '#multiple' => FALSE,
@@ -76,6 +67,7 @@ class TideWorkflowReviewerForm extends FormBase {
     $form['tide_workflow_reviewer']['message'] = [
       '#type' => 'textarea',
       '#title' => t('Message'),
+      '#default_value' => $node->getRevisionLogMessage() ? $node->getRevisionLogMessage() : '',
     ];
 
     $form['tide_workflow_reviewer']['submit'] = [
@@ -85,6 +77,7 @@ class TideWorkflowReviewerForm extends FormBase {
         [$this, 'apply'],
       ],
     ];
+    $form['#attached']['library'][] = 'tide_workflow_reviewer/tide-workflow-reviewer-form';
     return $form;
   }
 
@@ -100,11 +93,17 @@ class TideWorkflowReviewerForm extends FormBase {
    */
   public function apply(array $form, FormStateInterface $form_state) {
     $user_id = $form_state->getValue('options');
+    $message = $form_state->getValue('message');
     $user = User::load($user_id);
     $node = $this->routeMatch->getParameter('node');
-    $this->helper->updatesAssignedUserWithNode($node, $user);
-    $this->helper->mail($node, $user, ['message' => $form_state->getValue('message')]);
-    if ($this->routeMatch->getRouteName() != 'entity.node.canonical') {
+    TideWorkflowReviewerHelper::updatesAssignedUserWithNode($node, $user, $message);
+    TideWorkflowReviewerHelper::mail($node, $user, ['message' => $message]);
+    $valid_routes = [
+      'entity.node.latest_version',
+      'entity.node.canonical',
+    ];
+    // Redirect the page is the user in view.tide_workflow_reviewer_view.page_1.
+    if (!in_array($this->routeMatch->getRouteName(), $valid_routes)) {
       $form_state->setRedirect('view.tide_workflow_reviewer_view.page_1');
     }
   }

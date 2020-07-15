@@ -1,0 +1,8 @@
+form#tide-workflow-reviewer-form{
+  max-width: 450px;
+  background: #FAFAFA;
+  padding: 30px;
+  box-shadow: 1px 1px 25px rgba(0, 0, 0, 0.35);
+  border-radius: 10px;
+  border: 6px solid #305A72;
+}

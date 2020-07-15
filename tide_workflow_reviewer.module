@@ -9,6 +9,11 @@ use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\node\Entity\NodeType;
+use Drupal\node\NodeInterface;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\tide_workflow_reviewer\TideWorkflowReviewerHelper;
 
 /**
  * Implements hook_help().
@@ -48,7 +53,7 @@ function tide_workflow_reviewer_entity_extra_field_info() {
  * Implements hook_ENTITY_TYPE_view().
  */
 function tide_workflow_reviewer_node_view(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display, $view_mode) {
-  if ($entity->moderation_state->value == 'needs_review' && count(array_intersect(\Drupal::currentUser()->getRoles(), ['site_admin', 'administrator'])) > 0 && $display->getComponent('tide_workflow_reviewer_extra')) {
+  if ($entity->moderation_state->value == 'needs_review' && TideWorkflowReviewerHelper::hasPermissionToReviewerWidget(\Drupal::currentUser()) && $display->getComponent('tide_workflow_reviewer_extra')) {
     $build['tide_workflow_reviewer_extra'] = \Drupal::formBuilder()
       ->getForm('Drupal\tide_workflow_reviewer\Form\TideWorkflowReviewerForm');
   }
@@ -77,5 +82,59 @@ function tide_workflow_reviewer_mail($key, &$message, $params) {
       $message['body'][] = $params['message'];
       $message['body'][] = $user->getDisplayName();
       break;
+  }
+}
+
+/**
+ * Implements hook_node_access().
+ */
+function tide_workflow_reviewer_node_access(NodeInterface $node, $op, AccountInterface $account) {
+  if (\Drupal::moduleHandler()->moduleExists('workbench_reviewer')) {
+    // If moderation_state not equal to needs_review,
+    // don't interfere core permission check.
+    if ($node->moderation_state->value != 'needs_review') {
+      return AccessResult::neutral();
+    }
+    if ($op == 'update' || $op == 'delete') {
+      // If workbench_reviewer not set, don't interfere core permission check.
+      if ($node->workbench_reviewer->isEmpty()) {
+        return AccessResult::neutral();
+      }
+      // If workbench_reviewer is current user,
+      // don't interfere core permission check.
+      if ($node->workbench_reviewer->entity->id() == $account->id()) {
+        return AccessResult::neutral();
+      }
+      // Access denied against editors only happens when
+      // the assigned reviewer is reviewing the node.
+      // The users with site_admin role have permission to edit the node.
+      return AccessResult::forbiddenIf(!in_array('site_admin', $account->getRoles()));
+    }
+  }
+}
+
+/**
+ * Implements hook_form_BASE_FORM_ID_alter().
+ */
+function vicgovau_core_form_node_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  if (isset($form['workbench_reviewer'])) {
+    $form['revision_log']['#group'] = 'revision_information';
+    unset($form['workbench_reviewer']);
+    unset($form['workflow']);
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function tide_workflow_reviewer_form_content_moderation_entity_moderation_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  // Disable the moderation form if it is necessary.
+  // If the user with site_admin role, moderation form will be always opened.
+  // If the user is workbench_reviewer user, moderation form will be opened.
+  // For the user who is not reviewer will not allow to change moderation stats.
+  if (!TideWorkflowReviewerHelper::hasPermissionToReviewerWidget(\Drupal::currentUser())) {
+    $form['new_state']['#disabled'] = TRUE;
+    $form['revision_log']['#disabled'] = TRUE;
+    $form['submit']['#disabled'] = TRUE;
   }
 }
